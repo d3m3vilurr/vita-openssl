@@ -188,9 +188,11 @@ int RAND_poll(void)
     RAND_add(&curr_pid, sizeof curr_pid, 1);
     curr_pid = 0;
 
+#ifndef __vita__
     curr_uid = getuid();
     RAND_add(&curr_uid, sizeof curr_uid, 1);
     curr_uid = 0;
+#endif
 
     for (i = 0; i < (ENTROPY_NEEDED * 4); i++) {
         /*
@@ -307,7 +309,7 @@ int RAND_poll(void)
             do {
                 int try_read = 0;
 
-#   if defined(OPENSSL_SYS_BEOS_R5)
+#   if defined(OPENSSL_SYS_BEOS_R5) || defined (__vita__)
                 /*
                  * select() is broken in BeOS R5, so we simply try to read
                  * something and snooze if we couldn't
@@ -410,8 +412,10 @@ int RAND_poll(void)
     /* put in some default random data, we need more than just this */
     l = curr_pid;
     RAND_add(&l, sizeof(l), 0.0);
+    #ifndef __vita__
     l = getuid();
     RAND_add(&l, sizeof(l), 0.0);
+    #endif
 
     l = time(NULL);
     RAND_add(&l, sizeof(l), 0.0);

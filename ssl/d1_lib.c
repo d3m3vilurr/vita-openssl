@@ -66,10 +66,16 @@
 # include <sys/timeb.h>
 #endif
 
+#ifdef __vita__
+ #include <psp2/net/net.h>
+ #define sockaddr SceNetSockaddr
+#endif
+
 static void get_current_time(struct timeval *t);
 static void dtls1_set_handshake_header(SSL *s, int type, unsigned long len);
 static int dtls1_handshake_write(SSL *s);
 const char dtls1_version_str[] = "DTLSv1" OPENSSL_VERSION_PTEXT;
+
 int dtls1_listen(SSL *s, struct sockaddr *client);
 
 SSL3_ENC_METHOD DTLSv1_enc_data = {

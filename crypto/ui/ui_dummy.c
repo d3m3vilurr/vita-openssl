@@ -1,17 +1,12 @@
-/* bio_pk7.c */
-/*
- * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
- * project.
- */
 /* ====================================================================
- * Copyright (c) 2008 The OpenSSL Project.  All rights reserved.
+ * Copyright (c) 2001 The OpenSSL Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
+ *    notice, this list of conditions and the following disclaimer. 
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -21,12 +16,12 @@
  * 3. All advertising materials mentioning features or use of this
  *    software must display the following acknowledgment:
  *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit. (http://www.OpenSSL.org/)"
+ *    for use in the OpenSSL Toolkit. (http://www.openssl.org/)"
  *
  * 4. The names "OpenSSL Toolkit" and "OpenSSL Project" must not be used to
  *    endorse or promote products derived from this software without
  *    prior written permission. For written permission, please contact
- *    licensing@OpenSSL.org.
+ *    openssl-core@openssl.org.
  *
  * 5. Products derived from this software may not be called "OpenSSL"
  *    nor may "OpenSSL" appear in their names without prior written
@@ -35,7 +30,7 @@
  * 6. Redistributions of any form whatsoever must retain the following
  *    acknowledgment:
  *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit (http://www.OpenSSL.org/)"
+ *    for use in the OpenSSL Toolkit (http://www.openssl.org/)"
  *
  * THIS SOFTWARE IS PROVIDED BY THE OpenSSL PROJECT ``AS IS'' AND ANY
  * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -51,20 +46,44 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  * ====================================================================
  *
+ * This product includes cryptographic software written by Eric Young
+ * (eay@cryptsoft.com).  This product includes software written by Tim
+ * Hudson (tjh@cryptsoft.com).
+ *
  */
 
-#include <openssl/asn1.h>
-#include <openssl/pkcs7.h>
-#include <openssl/bio.h>
 
-#if !defined(OPENSSL_SYSNAME_NETWARE) && !defined(OPENSSL_SYSNAME_VXWORKS) && !defined(__vita__)
-# include <memory.h>
-#endif
-#include <stdio.h>
+#include <openssl/e_os2.h>
+#include "ui_locl.h"
 
-/* Streaming encode support for PKCS#7 */
+static int dummy_read_write_string(UI *ui, UI_STRING *uis);
+static int dummy_open_close(UI *ui);
 
-BIO *BIO_new_PKCS7(BIO *out, PKCS7 *p7)
-{
-    return BIO_new_NDEF(out, (ASN1_VALUE *)p7, ASN1_ITEM_rptr(PKCS7));
-}
+static UI_METHOD ui_dummy =
+	{
+	"Dummy user interface",
+	dummy_open_close,
+	dummy_read_write_string,
+	NULL,
+	dummy_read_write_string,
+	dummy_open_close,
+	NULL
+	};
+
+UI_METHOD *UI_OpenSSL(void)
+	{
+	return &ui_dummy;
+	}
+
+static int dummy_open_close(UI *ui)
+	{
+	/* Pretend that opening and closing the dummy UI succeeds. */
+	return 1;
+	}
+
+static int dummy_read_write_string(UI *ui, UI_STRING *uis)
+	{
+	/* Writing to and reading from the dummy UI is not possible. */
+	return 0;
+	}
+

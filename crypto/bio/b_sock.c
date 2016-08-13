@@ -524,7 +524,7 @@ void BIO_sock_cleanup(void)
 # endif
 }
 
-# if !defined(OPENSSL_SYS_VMS) || __VMS_VER >= 70000000
+# if (!defined(OPENSSL_SYS_VMS) || __VMS_VER >= 70000000) && !defined(__vita__)
 
 int BIO_socket_ioctl(int fd, long type, void *arg)
 {

@@ -86,7 +86,7 @@ void *_malloc32(__size_t);
                                  * _ANSI_C_SOURCE */
 #elif defined(__ultrix)
 # include <sys/syslog.h>
-#elif defined(OPENSSL_SYS_NETWARE)
+#elif defined(OPENSSL_SYS_NETWARE) || defined(__vita__)
 # define NO_SYSLOG
 #elif (!defined(MSDOS) || defined(WATT32)) && !defined(OPENSSL_SYS_VXWORKS) && !defined(NO_SYSLOG)
 # include <syslog.h>

@@ -116,6 +116,10 @@
  * [including the GNU Public Licence.]
  */
 
+#if defined(__vita__)
+ #include "ui_dummy.c"
+#else
+
 #include <openssl/e_os2.h>
 
 /*
@@ -714,4 +718,6 @@ static int noecho_fgets(char *buf, int size, FILE *tty)
 # endif
     return (strlen(buf));
 }
+#endif
+
 #endif

@@ -71,6 +71,10 @@
 extern "C" {
 #endif
 
+#ifdef __vita__
+#include "vita.h"
+#endif
+
 /* Used to checking reference counts, most while doing perl5 stuff :-) */
 # ifdef REF_PRINT
 #  undef REF_PRINT
@@ -209,6 +213,13 @@ extern "C" {
 #   define readsocket(s,b,n)               recv((s),(b),(n),0)
 #   define writesocket(s,b,n)              send((s),(b),(n),0)
 #  endif
+# elif defined(__vita__)
+#  define get_last_socket_error() (*(int*)sceNetErrnoLoc())
+#  define clear_socket_error()    (*(int*)sceNetErrnoLoc())=0
+#  define ioctlsocket(a,b,c)          Error ioctl_not_implemented_on_vita
+#  define closesocket(s)              sceNetSocketClose(s)
+#  define readsocket(s,b,n)           sceNetRecv((s),(b),(n), 0)
+#  define writesocket(s,b,n)          sceNetSend((s),(char *)(b),(n), 0)
 # else
 #  define get_last_socket_error() errno
 #  define clear_socket_error()    errno=0
@@ -589,19 +600,24 @@ struct servent *PASCAL getservbyname(const char *, const char *);
 #   elif !defined(OPENSSL_SYS_MPE)
 #    include <sys/time.h>       /* Needed under linux for FD_XXX */
 #   endif
-
+#ifndef __vita__
 #   include <netdb.h>
+#endif
 #   if defined(OPENSSL_SYS_VMS_NODECC)
 #    include <socket.h>
 #    include <in.h>
 #    include <inet.h>
 #   else
+#ifndef __vita__
 #    include <sys/socket.h>
+#endif
 #    ifdef FILIO_H
 #     include <sys/filio.h>     /* Added for FIONBIO under unixware */
 #    endif
+#ifndef __vita__
 #    include <netinet/in.h>
-#    if !defined(OPENSSL_SYS_BEOS_R5)
+#endif
+#    if !defined(OPENSSL_SYS_BEOS_R5) && !defined(__vita__)
 #     include <arpa/inet.h>
 #    endif
 #   endif
@@ -623,7 +639,6 @@ struct servent *PASCAL getservbyname(const char *, const char *);
 #    include <sys/filio.h>
 #   else
 #    ifndef VMS
-#     include <sys/ioctl.h>
 #    else
          /* ioctl is only in VMS > 7.0 and when socketshr is not used */
 #     if !defined(TCPIP_TYPE_SOCKETSHR) && defined(__VMS_VER) && (__VMS_VER > 70000000)
