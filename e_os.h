@@ -214,12 +214,12 @@ extern "C" {
 #   define writesocket(s,b,n)              send((s),(b),(n),0)
 #  endif
 # elif defined(__vita__)
-#  define get_last_socket_error() (*(int*)sceNetErrnoLoc())
-#  define clear_socket_error()    (*(int*)sceNetErrnoLoc())=0
-#  define ioctlsocket(a,b,c)          Error ioctl_not_implemented_on_vita
-#  define closesocket(s)              sceNetSocketClose(s)
-#  define readsocket(s,b,n)           sceNetRecv((s),(b),(n), 0)
-#  define writesocket(s,b,n)          sceNetSend((s),(char *)(b),(n), 0)
+#  define get_last_socket_error() errno
+#  define clear_socket_error()    errno=0
+#  define ioctlsocket(a,b,c)      setsockopt((a),SOL_SOCKET,(b),(c),sizeof(*(c)))
+#  define closesocket(s)          close(s)
+#  define readsocket(s,b,n)       recv((s),(char*)(b),(n),0)
+#  define writesocket(s,b,n)      send((s),(char*)(b),(n),0)
 # else
 #  define get_last_socket_error() errno
 #  define clear_socket_error()    errno=0
@@ -608,9 +608,7 @@ struct servent *PASCAL getservbyname(const char *, const char *);
 #    include <in.h>
 #    include <inet.h>
 #   else
-#ifndef __vita__
 #    include <sys/socket.h>
-#endif
 #    ifdef FILIO_H
 #     include <sys/filio.h>     /* Added for FIONBIO under unixware */
 #    endif
@@ -667,7 +665,7 @@ struct servent *PASCAL getservbyname(const char *, const char *);
  * Some IPv6 implementations are broken, disable them in known bad versions.
  */
 #  if !defined(OPENSSL_USE_IPV6)
-#   if defined(AF_INET6) && !defined(OPENSSL_SYS_BEOS_BONE) && !defined(NETWARE_CLIB)
+#   if defined(AF_INET6) && !defined(OPENSSL_SYS_BEOS_BONE) && !defined(NETWARE_CLIB) && !defined(__vita__)
 #    define OPENSSL_USE_IPV6 1
 #   else
 #    define OPENSSL_USE_IPV6 0

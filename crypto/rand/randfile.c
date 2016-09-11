@@ -107,6 +107,10 @@
 # define fdopen  _fdopen
 #endif
 
+#if defined(__vita__)
+# define chmod(f, mod)
+#endif
+
 #undef BUFSIZE
 #define BUFSIZE 1024
 #define RAND_DATA 1024
