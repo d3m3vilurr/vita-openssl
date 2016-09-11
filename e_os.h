@@ -612,9 +612,7 @@ struct servent *PASCAL getservbyname(const char *, const char *);
 #    ifdef FILIO_H
 #     include <sys/filio.h>     /* Added for FIONBIO under unixware */
 #    endif
-#ifndef __vita__
 #    include <netinet/in.h>
-#endif
 #    if !defined(OPENSSL_SYS_BEOS_R5) && !defined(__vita__)
 #     include <arpa/inet.h>
 #    endif
