@@ -67,8 +67,7 @@
 #endif
 
 #ifdef __vita__
- #include <psp2/net/net.h>
- #define sockaddr SceNetSockaddr
+ #include <vita.h>
 #endif
 
 static void get_current_time(struct timeval *t);
