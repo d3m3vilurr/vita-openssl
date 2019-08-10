@@ -66,10 +66,6 @@
 # include <sys/timeb.h>
 #endif
 
-#ifdef __vita__
- #include <vita.h>
-#endif
-
 static void get_current_time(struct timeval *t);
 static void dtls1_set_handshake_header(SSL *s, int type, unsigned long len);
 static int dtls1_handshake_write(SSL *s);

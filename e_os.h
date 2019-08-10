@@ -71,10 +71,6 @@
 extern "C" {
 #endif
 
-#ifdef __vita__
-#include "vita.h"
-#endif
-
 /* Used to checking reference counts, most while doing perl5 stuff :-) */
 # ifdef REF_PRINT
 #  undef REF_PRINT
@@ -600,9 +596,7 @@ struct servent *PASCAL getservbyname(const char *, const char *);
 #   elif !defined(OPENSSL_SYS_MPE)
 #    include <sys/time.h>       /* Needed under linux for FD_XXX */
 #   endif
-#ifndef __vita__
 #   include <netdb.h>
-#endif
 #   if defined(OPENSSL_SYS_VMS_NODECC)
 #    include <socket.h>
 #    include <in.h>
@@ -613,7 +607,7 @@ struct servent *PASCAL getservbyname(const char *, const char *);
 #     include <sys/filio.h>     /* Added for FIONBIO under unixware */
 #    endif
 #    include <netinet/in.h>
-#    if !defined(OPENSSL_SYS_BEOS_R5) && !defined(__vita__)
+#    if !defined(OPENSSL_SYS_BEOS_R5)
 #     include <arpa/inet.h>
 #    endif
 #   endif
