@@ -56,7 +56,7 @@
  * [including the GNU Public Licence.]
  */
 /* ====================================================================
- * Copyright (c) 1998-2007 The OpenSSL Project.  All rights reserved.
+ * Copyright (c) 1998-2018 The OpenSSL Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -329,7 +329,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_SSLV3,
-     SSL_NOT_EXP | SSL_HIGH | SSL_FIPS,
+     SSL_NOT_EXP | SSL_MEDIUM | SSL_FIPS,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -382,7 +382,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_SSLV3,
-     SSL_NOT_EXP | SSL_HIGH | SSL_FIPS,
+     SSL_NOT_EXP | SSL_MEDIUM | SSL_FIPS,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -434,7 +434,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_SSLV3,
-     SSL_NOT_EXP | SSL_HIGH | SSL_FIPS,
+     SSL_NOT_EXP | SSL_MEDIUM | SSL_FIPS,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -487,7 +487,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_SSLV3,
-     SSL_NOT_EXP | SSL_HIGH | SSL_FIPS,
+     SSL_NOT_EXP | SSL_MEDIUM | SSL_FIPS,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -539,7 +539,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_SSLV3,
-     SSL_NOT_EXP | SSL_HIGH | SSL_FIPS,
+     SSL_NOT_EXP | SSL_MEDIUM | SSL_FIPS,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -625,7 +625,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_SSLV3,
-     SSL_NOT_DEFAULT | SSL_NOT_EXP | SSL_HIGH | SSL_FIPS,
+     SSL_NOT_DEFAULT | SSL_NOT_EXP | SSL_MEDIUM | SSL_FIPS,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -712,7 +712,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_SSLV3,
-     SSL_NOT_EXP | SSL_HIGH | SSL_FIPS,
+     SSL_NOT_EXP | SSL_MEDIUM | SSL_FIPS,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -778,7 +778,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_MD5,
      SSL_SSLV3,
-     SSL_NOT_EXP | SSL_HIGH,
+     SSL_NOT_EXP | SSL_MEDIUM,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -1728,7 +1728,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_TLSV1,
-     SSL_NOT_EXP | SSL_HIGH | SSL_FIPS,
+     SSL_NOT_EXP | SSL_MEDIUM | SSL_FIPS,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -2120,7 +2120,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_TLSV1,
-     SSL_NOT_EXP | SSL_HIGH | SSL_FIPS,
+     SSL_NOT_EXP | SSL_MEDIUM | SSL_FIPS,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -2200,7 +2200,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_TLSV1,
-     SSL_NOT_EXP | SSL_HIGH | SSL_FIPS,
+     SSL_NOT_EXP | SSL_MEDIUM | SSL_FIPS,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -2280,7 +2280,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_TLSV1,
-     SSL_NOT_EXP | SSL_HIGH | SSL_FIPS,
+     SSL_NOT_EXP | SSL_MEDIUM | SSL_FIPS,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -2360,7 +2360,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_TLSV1,
-     SSL_NOT_EXP | SSL_HIGH | SSL_FIPS,
+     SSL_NOT_EXP | SSL_MEDIUM | SSL_FIPS,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -2440,7 +2440,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_TLSV1,
-     SSL_NOT_DEFAULT | SSL_NOT_EXP | SSL_HIGH | SSL_FIPS,
+     SSL_NOT_DEFAULT | SSL_NOT_EXP | SSL_MEDIUM | SSL_FIPS,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -2490,7 +2490,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_TLSV1,
-     SSL_NOT_EXP | SSL_HIGH,
+     SSL_NOT_EXP | SSL_MEDIUM,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -2506,7 +2506,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_TLSV1,
-     SSL_NOT_EXP | SSL_HIGH,
+     SSL_NOT_EXP | SSL_MEDIUM,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -2522,7 +2522,7 @@ OPENSSL_GLOBAL SSL_CIPHER ssl3_ciphers[] = {
      SSL_3DES,
      SSL_SHA1,
      SSL_TLSV1,
-     SSL_NOT_EXP | SSL_HIGH,
+     SSL_NOT_EXP | SSL_MEDIUM,
      SSL_HANDSHAKE_MAC_DEFAULT | TLS1_PRF,
      112,
      168,
@@ -3018,9 +3018,9 @@ int ssl3_new(SSL *s)
 {
     SSL3_STATE *s3;
 
-    if ((s3 = OPENSSL_malloc(sizeof *s3)) == NULL)
+    if ((s3 = OPENSSL_malloc(sizeof(*s3))) == NULL)
         goto err;
-    memset(s3, 0, sizeof *s3);
+    memset(s3, 0, sizeof(*s3));
     memset(s3->rrec.seq_num, 0, sizeof(s3->rrec.seq_num));
     memset(s3->wrec.seq_num, 0, sizeof(s3->wrec.seq_num));
 
@@ -3078,7 +3078,7 @@ void ssl3_free(SSL *s)
 #ifndef OPENSSL_NO_SRP
     SSL_SRP_CTX_free(s);
 #endif
-    OPENSSL_cleanse(s->s3, sizeof *s->s3);
+    OPENSSL_cleanse(s->s3, sizeof(*s->s3));
     OPENSSL_free(s->s3);
     s->s3 = NULL;
 }
@@ -3142,7 +3142,7 @@ void ssl3_clear(SSL *s)
         s->s3->alpn_selected = NULL;
     }
 #endif
-    memset(s->s3, 0, sizeof *s->s3);
+    memset(s->s3, 0, sizeof(*s->s3));
     s->s3->rbuf.buf = rp;
     s->s3->wbuf.buf = wp;
     s->s3->rbuf.len = rlen;
@@ -4228,8 +4228,13 @@ int ssl3_get_req_cert_type(SSL *s, unsigned char *p)
 #ifndef OPENSSL_NO_ECDSA
     int have_ecdsa_sign = 0;
 #endif
+#if !defined(OPENSSL_NO_DH) || !defined(OPENSSL_NO_ECDH)
     int nostrict = 1;
+#endif
+#if !defined(OPENSSL_NO_GOST) || !defined(OPENSSL_NO_DH) || \
+    !defined(OPENSSL_NO_ECDH)
     unsigned long alg_k;
+#endif
 
     /* If we have custom certificate types set, use them */
     if (s->cert->ctypes) {
@@ -4237,9 +4242,11 @@ int ssl3_get_req_cert_type(SSL *s, unsigned char *p)
         return (int)s->cert->ctype_num;
     }
     /* get configured sigalgs */
-    siglen = tls12_get_psigalgs(s, &sig);
+    siglen = tls12_get_psigalgs(s, 1, &sig);
+#if !defined(OPENSSL_NO_DH) || !defined(OPENSSL_NO_ECDH)
     if (s->cert->cert_flags & SSL_CERT_FLAGS_CHECK_TLS_STRICT)
         nostrict = 0;
+#endif
     for (i = 0; i < siglen; i += 2, sig += 2) {
         switch (sig[1]) {
         case TLSEXT_signature_rsa:
@@ -4257,7 +4264,10 @@ int ssl3_get_req_cert_type(SSL *s, unsigned char *p)
         }
     }
 
+#if !defined(OPENSSL_NO_GOST) || !defined(OPENSSL_NO_DH) || \
+    !defined(OPENSSL_NO_ECDH)
     alg_k = s->s3->tmp.new_cipher->algorithm_mkey;
+#endif
 
 #ifndef OPENSSL_NO_GOST
     if (s->version >= TLS1_VERSION) {

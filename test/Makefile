@@ -70,8 +70,11 @@ HEARTBEATTEST=  heartbeat_test
 CONSTTIMETEST=  constant_time_test
 VERIFYEXTRATEST=	verify_extra_test
 CLIENTHELLOTEST=	clienthellotest
+BADDTLSTEST=	bad_dtls_test
 SSLV2CONFTEST = 	sslv2conftest
-
+DTLSTEST =	dtlstest
+FATALERRTEST =	fatalerrtest
+X509TIMETEST = x509_time_test
 TESTS=		alltests
 
 EXE=	
@@ -83,7 +86,7 @@ OBJ=
 SRC=
 
 EXHEADER= 
-HEADER=	testutil.h $(EXHEADER)
+HEADER=	testutil.h ssltestlib.h $(EXHEADER)
 
 ALL=    $(GENERAL) $(SRC) $(HEADER)
 
@@ -124,7 +127,8 @@ alltests: \
 	test_gen test_req test_pkcs7 test_verify test_dh test_dsa \
 	test_ss test_ca test_engine test_evp test_evp_extra test_ssl test_tsa test_ige \
 	test_jpake test_srp test_cms test_ocsp test_v3name test_heartbeat \
-	test_constant_time test_verify_extra test_clienthello test_sslv2conftest
+	test_constant_time test_verify_extra test_clienthello test_sslv2conftest \
+	test_dtls test_bad_dtls test_fatalerr test_x509_time
 
 test_evp: $(EVPTEST)$(EXE_EXT) evptests.txt
 	../util/shlib_wrap.sh ./$(EVPTEST) evptests.txt
@@ -272,6 +276,7 @@ test_ssl: keyU.ss certU.ss certCA.ss certP1.ss keyP1.ss certP2.ss keyP2.ss \
 	fi
 	../util/shlib_wrap.sh ./$(SSLTEST) -test_cipherlist
 	@sh ./testssl keyU.ss certU.ss certCA.ss
+	@sh ./testssl keyU.ss certU.ss certCA.ss -rle
 	@sh ./testsslproxy keyP1.ss certP1.ss intP1.ss
 	@sh ./testsslproxy keyP2.ss certP2.ss intP2.ss
 
@@ -333,9 +338,25 @@ test_clienthello: $(CLIENTHELLOTEST)$(EXE_EXT)
 	@echo $(START) $@
 	../util/shlib_wrap.sh ./$(CLIENTHELLOTEST)
 
+test_bad_dtls: $(BADDTLSTEST)$(EXE_EXT)
+	@echo $(START) $@
+	../util/shlib_wrap.sh ./$(BADDTLSTEST)
+
+test_fatalerr: $(FATALERRTEST)$(EXE_EXT)
+	@echo $(START) $@
+	../util/shlib_wrap.sh ./$(FATALERRTEST) ../apps/server.pem ../apps/server.pem
+
+test_x509_time: $(X509TIMETEST)$(EXE_EXT)
+	@echo $(START) $@
+	../util/shlib_wrap.sh ./$(X509TIMETEST)
+
 test_sslv2conftest: $(SSLV2CONFTEST)$(EXE_EXT)
 	@echo $(START) $@
 	../util/shlib_wrap.sh ./$(SSLV2CONFTEST)
+
+test_dtls: $(DTLSTEST)$(EXE_EXT)
+	@echo $(START) $@
+	../util/shlib_wrap.sh ./$(DTLSTEST) ../apps/server.pem ../apps/server.pem
 
 lint:
 	lint -DLINT $(INCLUDES) $(SRC)>fluff
@@ -368,7 +389,7 @@ BUILD_CMD=shlib_target=; if [ -n "$(SHARED_LIBS)" ]; then \
 	fi; \
 	LIBRARIES="$(LIBSSL) $(LIBCRYPTO) $(LIBKRB5)"; \
 	$(MAKE) -f $(TOP)/Makefile.shared -e \
-		CC="$${CC}" APPNAME=$$target$(EXE_EXT) OBJECTS="$$target.o" \
+		CC="$${CC}" APPNAME=$$target$(EXE_EXT) OBJECTS="$$target.o $$exobj" \
 		LIBDEPS="$(PEX_LIBS) $$LIBRARIES $(EX_LIBS)" \
 		link_app.$${shlib_target}
 
@@ -514,8 +535,20 @@ $(VERIFYEXTRATEST)$(EXE_EXT): $(VERIFYEXTRATEST).o
 $(CLIENTHELLOTEST)$(EXE_EXT): $(CLIENTHELLOTEST).o
 	@target=$(CLIENTHELLOTEST) $(BUILD_CMD)
 
+$(BADDTLSTEST)$(EXE_EXT): $(BADDTLSTEST).o
+	@target=$(BADDTLSTEST) $(BUILD_CMD)
+
+$(FATALERRTEST)$(EXE_EXT): $(FATALERRTEST).o ssltestlib.o $(DLIBSSL) $(DLIBCRYPTO)
+	@target=$(FATALERRTEST); exobj=ssltestlib.o; $(BUILD_CMD)
+
+$(X509TIMETEST)$(EXE_EXT): $(X509TIMETEST).o
+	@target=$(X509TIMETEST) $(BUILD_CMD)
+
 $(SSLV2CONFTEST)$(EXE_EXT): $(SSLV2CONFTEST).o
 	@target=$(SSLV2CONFTEST) $(BUILD_CMD)
+
+$(DTLSTEST)$(EXE_EXT): $(DTLSTEST).o ssltestlib.o $(DLIBSSL) $(DLIBCRYPTO)
+	@target=$(DTLSTEST); exobj=ssltestlib.o; $(BUILD_CMD)
 
 #$(AESTEST).o: $(AESTEST).c
 #	$(CC) -c $(CFLAGS) -DINTERMEDIATE_VALUE_KAT -DTRACE_KAT_MCT $(AESTEST).c

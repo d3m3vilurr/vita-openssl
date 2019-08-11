@@ -56,7 +56,7 @@
  * [including the GNU Public Licence.]
  */
 /* ====================================================================
- * Copyright (c) 1998-2006 The OpenSSL Project.  All rights reserved.
+ * Copyright (c) 1998-2018 The OpenSSL Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -337,7 +337,7 @@ static void sc_usage(void)
     BIO_printf(bio_err,
                " -prexit       - print session information even on connection failure\n");
     BIO_printf(bio_err,
-               " -showcerts    - show all certificates in the chain\n");
+               " -showcerts    - Show all certificates sent by the server\n");
     BIO_printf(bio_err, " -debug        - extra output\n");
 #ifdef WATT32
     BIO_printf(bio_err, " -wdebug       - WATT-32 tcp debugging\n");
@@ -630,10 +630,11 @@ static int serverinfo_cli_parse_cb(SSL *s, unsigned int ext_type,
     unsigned char ext_buf[4 + 65536];
 
     /* Reconstruct the type/len fields prior to extension data */
-    ext_buf[0] = ext_type >> 8;
-    ext_buf[1] = ext_type & 0xFF;
-    ext_buf[2] = inlen >> 8;
-    ext_buf[3] = inlen & 0xFF;
+    inlen &= 0xffff; /* for formal memcpy correctness */
+    ext_buf[0] = (unsigned char)(ext_type >> 8);
+    ext_buf[1] = (unsigned char)(ext_type);
+    ext_buf[2] = (unsigned char)(inlen >> 8);
+    ext_buf[3] = (unsigned char)(inlen);
     memcpy(ext_buf + 4, in, inlen);
 
     BIO_snprintf(pem_name, sizeof(pem_name), "SERVERINFO FOR EXTENSION %d",
@@ -694,12 +695,12 @@ int MAIN(int argc, char **argv)
     char *inrand = NULL;
     int mbuf_len = 0;
     struct timeval timeout, *timeoutp;
-#ifndef OPENSSL_NO_ENGINE
     char *engine_id = NULL;
+    ENGINE *e = NULL;
+#ifndef OPENSSL_NO_ENGINE
     char *ssl_client_engine_id = NULL;
     ENGINE *ssl_client_engine = NULL;
 #endif
-    ENGINE *e = NULL;
 #if defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_MSDOS) || defined(OPENSSL_SYS_NETWARE) || defined(OPENSSL_SYS_BEOS_R5)
     struct timeval tv;
 # if defined(OPENSSL_SYS_BEOS_R5)
@@ -1186,8 +1187,8 @@ int MAIN(int argc, char **argv)
         next_proto.data = NULL;
 #endif
 
-#ifndef OPENSSL_NO_ENGINE
     e = setup_engine(bio_err, engine_id, 1);
+#ifndef OPENSSL_NO_ENGINE
     if (ssl_client_engine_id) {
         ssl_client_engine = ENGINE_by_id(ssl_client_engine_id);
         if (!ssl_client_engine) {
@@ -1561,7 +1562,10 @@ int MAIN(int argc, char **argv)
     SSL_set_connect_state(con);
 
     /* ok, lets connect */
-    width = SSL_get_fd(con) + 1;
+    if (fileno_stdin() > SSL_get_fd(con))
+        width = fileno_stdin() + 1;
+    else
+        width = SSL_get_fd(con) + 1;
 
     read_tty = 1;
     write_tty = 0;
@@ -1664,6 +1668,8 @@ int MAIN(int argc, char **argv)
             if (strstr(mbuf, "/stream:features>"))
                 goto shut;
             seen = BIO_read(sbio, mbuf, BUFSIZZ);
+            if (seen <= 0)
+                goto shut;
             mbuf[seen] = 0;
         }
         BIO_printf(sbio,
@@ -1744,9 +1750,11 @@ int MAIN(int argc, char **argv)
 #if !defined(OPENSSL_SYS_WINDOWS) && !defined(OPENSSL_SYS_MSDOS) && !defined(OPENSSL_SYS_NETWARE) && !defined (OPENSSL_SYS_BEOS_R5)
             if (tty_on) {
                 if (read_tty)
-                    openssl_fdset(fileno(stdin), &readfds);
+                    openssl_fdset(fileno_stdin(), &readfds);
+#if !defined(OPENSSL_SYS_VMS)
                 if (write_tty)
-                    openssl_fdset(fileno(stdout), &writefds);
+                    openssl_fdset(fileno_stdout(), &writefds);
+#endif
             }
             if (read_ssl)
                 openssl_fdset(SSL_get_fd(con), &readfds);
@@ -1816,14 +1824,14 @@ int MAIN(int argc, char **argv)
             /* Under BeOS-R5 the situation is similar to DOS */
             i = 0;
             stdin_set = 0;
-            (void)fcntl(fileno(stdin), F_SETFL, O_NONBLOCK);
+            (void)fcntl(fileno_stdin(), F_SETFL, O_NONBLOCK);
             if (!write_tty) {
                 if (read_tty) {
                     tv.tv_sec = 1;
                     tv.tv_usec = 0;
                     i = select(width, (void *)&readfds, (void *)&writefds,
                                NULL, &tv);
-                    if (read(fileno(stdin), sbuf, 0) >= 0)
+                    if (read(fileno_stdin(), sbuf, 0) >= 0)
                         stdin_set = 1;
                     if (!i && (stdin_set != 1 || !read_tty))
                         continue;
@@ -1831,7 +1839,7 @@ int MAIN(int argc, char **argv)
                     i = select(width, (void *)&readfds, (void *)&writefds,
                                NULL, timeoutp);
             }
-            (void)fcntl(fileno(stdin), F_SETFL, 0);
+            (void)fcntl(fileno_stdin(), F_SETFL, 0);
 #else
             i = select(width, (void *)&readfds, (void *)&writefds,
                        NULL, timeoutp);
@@ -1907,11 +1915,11 @@ int MAIN(int argc, char **argv)
                 goto shut;
             }
         }
-#if defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_MSDOS) || defined(OPENSSL_SYS_NETWARE) || defined(OPENSSL_SYS_BEOS_R5)
+#if defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_MSDOS) || defined(OPENSSL_SYS_NETWARE) || defined(OPENSSL_SYS_BEOS_R5) || defined(OPENSSL_SYS_VMS)
         /* Assume Windows/DOS/BeOS can always write */
         else if (!ssl_pending && write_tty)
 #else
-        else if (!ssl_pending && FD_ISSET(fileno(stdout), &writefds))
+        else if (!ssl_pending && FD_ISSET(fileno_stdout(), &writefds))
 #endif
         {
 #ifdef CHARSET_EBCDIC
@@ -2009,7 +2017,7 @@ int MAIN(int argc, char **argv)
 #elif defined(OPENSSL_SYS_BEOS_R5)
         else if (stdin_set)
 #else
-        else if (FD_ISSET(fileno(stdin), &readfds))
+        else if (FD_ISSET(fileno_stdin(), &readfds))
 #endif
         {
             if (crlf) {
@@ -2118,6 +2126,7 @@ int MAIN(int argc, char **argv)
         OPENSSL_cleanse(mbuf, BUFSIZZ);
         OPENSSL_free(mbuf);
     }
+    release_engine(e);
     if (bio_c_out != NULL) {
         BIO_free(bio_c_out);
         bio_c_out = NULL;
@@ -2126,6 +2135,7 @@ int MAIN(int argc, char **argv)
         BIO_free(bio_c_msg);
         bio_c_msg = NULL;
     }
+    SSL_COMP_free_compression_methods();
     apps_shutdown();
     OPENSSL_EXIT(ret);
 }
@@ -2156,10 +2166,10 @@ static void print_stuff(BIO *bio, SSL *s, int full)
             BIO_printf(bio, "---\nCertificate chain\n");
             for (i = 0; i < sk_X509_num(sk); i++) {
                 X509_NAME_oneline(X509_get_subject_name(sk_X509_value(sk, i)),
-                                  buf, sizeof buf);
+                                  buf, sizeof(buf));
                 BIO_printf(bio, "%2d s:%s\n", i, buf);
                 X509_NAME_oneline(X509_get_issuer_name(sk_X509_value(sk, i)),
-                                  buf, sizeof buf);
+                                  buf, sizeof(buf));
                 BIO_printf(bio, "   i:%s\n", buf);
                 if (c_showcerts)
                     PEM_write_bio_X509(bio, sk_X509_value(sk, i));
@@ -2174,9 +2184,9 @@ static void print_stuff(BIO *bio, SSL *s, int full)
             /* Redundant if we showed the whole chain */
             if (!(c_showcerts && got_a_chain))
                 PEM_write_bio_X509(bio, peer);
-            X509_NAME_oneline(X509_get_subject_name(peer), buf, sizeof buf);
+            X509_NAME_oneline(X509_get_subject_name(peer), buf, sizeof(buf));
             BIO_printf(bio, "subject=%s\n", buf);
-            X509_NAME_oneline(X509_get_issuer_name(peer), buf, sizeof buf);
+            X509_NAME_oneline(X509_get_issuer_name(peer), buf, sizeof(buf));
             BIO_printf(bio, "issuer=%s\n", buf);
         } else
             BIO_printf(bio, "no peer certificate available\n");
@@ -2193,7 +2203,7 @@ static void print_stuff(BIO *bio, SSL *s, int full)
         } else {
             BIO_printf(bio, "---\nNo client certificate CA names sent\n");
         }
-        p = SSL_get_shared_ciphers(s, buf, sizeof buf);
+        p = SSL_get_shared_ciphers(s, buf, sizeof(buf));
         if (p != NULL) {
             /*
              * This works only for SSL 2.  In later protocol versions, the

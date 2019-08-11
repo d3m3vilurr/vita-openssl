@@ -4,7 +4,7 @@
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
  */
 /* ====================================================================
- * Copyright (c) 1998-2005 The OpenSSL Project.  All rights reserved.
+ * Copyright (c) 1998-2019 The OpenSSL Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -125,7 +125,7 @@
 /* mod 128 saturating subtract of two 64-bit values in big-endian order */
 static int satsub64be(const unsigned char *v1, const unsigned char *v2)
 {
-    int ret, sat, brw, i;
+    int ret, i;
 
     if (sizeof(long) == 8)
         do {
@@ -157,28 +157,51 @@ static int satsub64be(const unsigned char *v1, const unsigned char *v2)
                 return (int)l;
         } while (0);
 
-    ret = (int)v1[7] - (int)v2[7];
-    sat = 0;
-    brw = ret >> 8;             /* brw is either 0 or -1 */
-    if (ret & 0x80) {
-        for (i = 6; i >= 0; i--) {
-            brw += (int)v1[i] - (int)v2[i];
-            sat |= ~brw;
-            brw >>= 8;
-        }
-    } else {
-        for (i = 6; i >= 0; i--) {
-            brw += (int)v1[i] - (int)v2[i];
-            sat |= brw;
-            brw >>= 8;
+    ret = 0;
+    for (i=0; i<7; i++) {
+        if (v1[i] > v2[i]) {
+            /* v1 is larger... but by how much? */
+            if (v1[i] != v2[i] + 1)
+                return 128;
+            while (++i <= 6) {
+                if (v1[i] != 0x00 || v2[i] != 0xff)
+                    return 128; /* too much */
+            }
+            /* We checked all the way to the penultimate byte,
+             * so despite higher bytes changing we actually
+             * know that it only changed from (e.g.)
+             *       ... (xx)  ff ff ff ??
+             * to   ... (xx+1) 00 00 00 ??
+             * so we add a 'bias' of 256 for the carry that
+             * happened, and will eventually return
+             * 256 + v1[7] - v2[7]. */
+            ret = 256;
+            break;
+        } else if (v2[i] > v1[i]) {
+            /* v2 is larger... but by how much? */
+            if (v2[i] != v1[i] + 1)
+                return -128;
+            while (++i <= 6) {
+                if (v2[i] != 0x00 || v1[i] != 0xff)
+                    return -128; /* too much */
+            }
+            /* Similar to the case above, we know it changed
+             * from    ... (xx)  00 00 00 ??
+             * to     ... (xx-1) ff ff ff ??
+             * so we add a 'bias' of -256 for the borrow,
+             * to return -256 + v1[7] - v2[7]. */
+            ret = -256;
         }
     }
-    brw <<= 8;                  /* brw is either 0 or -256 */
 
-    if (sat & 0xff)
-        return brw | 0x80;
+    ret += (int)v1[7] - (int)v2[7];
+
+    if (ret > 128)
+        return 128;
+    else if (ret < -128)
+        return -128;
     else
-        return brw + (ret & 0xFF);
+        return ret;
 }
 
 static int have_handshake_fragment(SSL *s, int type, unsigned char *buf,
@@ -194,7 +217,7 @@ static int dtls1_record_needs_buffering(SSL *s, SSL3_RECORD *rr,
 #endif
 static int dtls1_buffer_record(SSL *s, record_pqueue *q,
                                unsigned char *priority);
-static int dtls1_process_record(SSL *s);
+static int dtls1_process_record(SSL *s, DTLS1_BITMAP *bitmap);
 
 /* copy buffered record into SSL structure */
 static int dtls1_copy_record(SSL *s, pitem *item)
@@ -270,14 +293,12 @@ dtls1_buffer_record(SSL *s, record_pqueue *queue, unsigned char *priority)
         return (-1);
     }
 
-    /* insert should not fail, since duplicates are dropped */
     if (pqueue_insert(queue->q, item) == NULL) {
-        SSLerr(SSL_F_DTLS1_BUFFER_RECORD, ERR_R_INTERNAL_ERROR);
+        /* Must be a duplicate so ignore it */
         if (rdata->rbuf.buf != NULL)
             OPENSSL_free(rdata->rbuf.buf);
         OPENSSL_free(rdata);
         pitem_free(item);
-        return (-1);
     }
 
     return (1);
@@ -319,21 +340,70 @@ static int dtls1_retrieve_buffered_record(SSL *s, record_pqueue *queue)
 static int dtls1_process_buffered_records(SSL *s)
 {
     pitem *item;
+    SSL3_BUFFER *rb;
+    SSL3_RECORD *rr;
+    DTLS1_BITMAP *bitmap;
+    unsigned int is_next_epoch;
+    int replayok = 1;
 
     item = pqueue_peek(s->d1->unprocessed_rcds.q);
     if (item) {
         /* Check if epoch is current. */
         if (s->d1->unprocessed_rcds.epoch != s->d1->r_epoch)
-            return (1);         /* Nothing to do. */
+            return 1;         /* Nothing to do. */
+
+        rr = &s->s3->rrec;
+        rb = &s->s3->rbuf;
+
+        if (rb->left > 0) {
+            /*
+             * We've still got data from the current packet to read. There could
+             * be a record from the new epoch in it - so don't overwrite it
+             * with the unprocessed records yet (we'll do it when we've
+             * finished reading the current packet).
+             */
+            return 1;
+        }
+
 
         /* Process all the records. */
         while (pqueue_peek(s->d1->unprocessed_rcds.q)) {
             dtls1_get_unprocessed_record(s);
-            if (!dtls1_process_record(s))
-                return (0);
+            bitmap = dtls1_get_bitmap(s, rr, &is_next_epoch);
+            if (bitmap == NULL) {
+                /*
+                 * Should not happen. This will only ever be NULL when the
+                 * current record is from a different epoch. But that cannot
+                 * be the case because we already checked the epoch above
+                 */
+                 SSLerr(SSL_F_DTLS1_PROCESS_BUFFERED_RECORDS,
+                        ERR_R_INTERNAL_ERROR);
+                 return 0;
+            }
+#ifndef OPENSSL_NO_SCTP
+            /* Only do replay check if no SCTP bio */
+            if (!BIO_dgram_is_sctp(SSL_get_rbio(s)))
+#endif
+            {
+                /*
+                 * Check whether this is a repeat, or aged record. We did this
+                 * check once already when we first received the record - but
+                 * we might have updated the window since then due to
+                 * records we subsequently processed.
+                 */
+                replayok = dtls1_record_replay_check(s, bitmap);
+            }
+
+            if (!replayok || !dtls1_process_record(s, bitmap)) {
+                /* dump this record */
+                rr->length = 0;
+                s->packet_length = 0;
+                continue;
+            }
+
             if (dtls1_buffer_record(s, &(s->d1->processed_rcds),
                                     s->s3->rrec.seq_num) < 0)
-                return -1;
+                return 0;
         }
     }
 
@@ -344,7 +414,7 @@ static int dtls1_process_buffered_records(SSL *s)
     s->d1->processed_rcds.epoch = s->d1->r_epoch;
     s->d1->unprocessed_rcds.epoch = s->d1->r_epoch + 1;
 
-    return (1);
+    return 1;
 }
 
 #if 0
@@ -391,7 +461,7 @@ static int dtls1_get_buffered_record(SSL *s)
 
 #endif
 
-static int dtls1_process_record(SSL *s)
+static int dtls1_process_record(SSL *s, DTLS1_BITMAP *bitmap)
 {
     int i, al;
     int enc_err;
@@ -551,6 +621,10 @@ static int dtls1_process_record(SSL *s)
 
     /* we have pulled in a full packet so zero things */
     s->packet_length = 0;
+
+    /* Mark receipt of record. */
+    dtls1_record_bitmap_update(s, bitmap);
+
     return (1);
 
  f_err:
@@ -581,11 +655,12 @@ int dtls1_get_record(SSL *s)
 
     rr = &(s->s3->rrec);
 
+ again:
     /*
      * The epoch may have changed.  If so, process all the pending records.
      * This is a non-blocking operation.
      */
-    if (dtls1_process_buffered_records(s) < 0)
+    if (!dtls1_process_buffered_records(s))
         return -1;
 
     /* if we're renegotiating, then there may be buffered records */
@@ -593,7 +668,6 @@ int dtls1_get_record(SSL *s)
         return 1;
 
     /* get something from the wire */
- again:
     /* check if we have the header */
     if ((s->rstate != SSL_ST_READ_BODY) ||
         (s->packet_length < DTLS1_RT_HEADER_LENGTH)) {
@@ -630,8 +704,11 @@ int dtls1_get_record(SSL *s)
 
         n2s(p, rr->length);
 
-        /* Lets check version */
-        if (!s->first_packet) {
+        /*
+         * Lets check the version. We tolerate alerts that don't have the exact
+         * version number (e.g. because of protocol version errors)
+         */
+        if (!s->first_packet && rr->type != SSL3_RT_ALERT) {
             if (version != s->version) {
                 /* unexpected version, silently discard */
                 rr->length = 0;
@@ -721,20 +798,17 @@ int dtls1_get_record(SSL *s)
             if (dtls1_buffer_record
                 (s, &(s->d1->unprocessed_rcds), rr->seq_num) < 0)
                 return -1;
-            /* Mark receipt of record. */
-            dtls1_record_bitmap_update(s, bitmap);
         }
         rr->length = 0;
         s->packet_length = 0;
         goto again;
     }
 
-    if (!dtls1_process_record(s)) {
+    if (!dtls1_process_record(s, bitmap)) {
         rr->length = 0;
         s->packet_length = 0;   /* dump this record */
         goto again;             /* get another record */
     }
-    dtls1_record_bitmap_update(s, bitmap); /* Mark receipt of record. */
 
     return (1);
 
@@ -878,6 +952,13 @@ int dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
         goto start;
     }
 
+    /*
+     * Reset the count of consecutive warning alerts if we've got a non-empty
+     * record that isn't an alert.
+     */
+    if (rr->type != SSL3_RT_ALERT && rr->length != 0)
+        s->cert->alert_count = 0;
+
     /* we now have a packet which can be read and processed */
 
     if (s->s3->change_cipher_spec /* set when we receive ChangeCipherSpec,
@@ -981,7 +1062,7 @@ int dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
         unsigned int *dest_len = NULL;
 
         if (rr->type == SSL3_RT_HANDSHAKE) {
-            dest_maxlen = sizeof s->d1->handshake_fragment;
+            dest_maxlen = sizeof(s->d1->handshake_fragment);
             dest = s->d1->handshake_fragment;
             dest_len = &s->d1->handshake_fragment_len;
         } else if (rr->type == SSL3_RT_ALERT) {
@@ -1122,6 +1203,24 @@ int dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
         goto start;
     }
 
+    /*
+     * If we are a server and get a client hello when renegotiation isn't
+     * allowed send back a no renegotiation alert and carry on.
+     */
+    if (s->server
+            && SSL_is_init_finished(s)
+            && !s->s3->send_connection_binding
+            && s->d1->handshake_fragment_len >= DTLS1_HM_HEADER_LENGTH
+            && s->d1->handshake_fragment[0] == SSL3_MT_CLIENT_HELLO
+            && s->s3->previous_client_finished_len != 0
+            && (s->options & SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION) == 0) {
+        s->d1->handshake_fragment_len = 0;
+        rr->length = 0;
+        ssl3_send_alert(s, SSL3_AL_WARNING, SSL_AD_NO_RENEGOTIATION);
+        goto start;
+    }
+
+
     if (s->d1->alert_fragment_len >= DTLS1_AL_HEADER_LENGTH) {
         int alert_level = s->d1->alert_fragment[0];
         int alert_descr = s->d1->alert_fragment[1];
@@ -1144,6 +1243,14 @@ int dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 
         if (alert_level == SSL3_AL_WARNING) {
             s->s3->warn_alert = alert_descr;
+
+            s->cert->alert_count++;
+            if (s->cert->alert_count == MAX_WARN_ALERT_COUNT) {
+                al = SSL_AD_UNEXPECTED_MESSAGE;
+                SSLerr(SSL_F_DTLS1_READ_BYTES, SSL_R_TOO_MANY_WARN_ALERTS);
+                goto f_err;
+            }
+
             if (alert_descr == SSL_AD_CLOSE_NOTIFY) {
 #ifndef OPENSSL_NO_SCTP
                 /*
@@ -1198,10 +1305,11 @@ int dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
             s->s3->fatal_alert = alert_descr;
             SSLerr(SSL_F_DTLS1_READ_BYTES,
                    SSL_AD_REASON_OFFSET + alert_descr);
-            BIO_snprintf(tmp, sizeof tmp, "%d", alert_descr);
+            BIO_snprintf(tmp, sizeof(tmp), "%d", alert_descr);
             ERR_add_error_data(2, "SSL alert number ", tmp);
             s->shutdown |= SSL_RECEIVED_SHUTDOWN;
-            SSL_CTX_remove_session(s->ctx, s->session);
+            SSL_CTX_remove_session(s->session_ctx, s->session);
+            s->state = SSL_ST_ERR;
             return (0);
         } else {
             al = SSL_AD_ILLEGAL_PARAMETER;
@@ -1235,9 +1343,9 @@ int dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
         /* XDTLS: check that epoch is consistent */
         if ((rr->length != ccs_hdr_len) ||
             (rr->off != 0) || (rr->data[0] != SSL3_MT_CCS)) {
-            i = SSL_AD_ILLEGAL_PARAMETER;
+            al = SSL_AD_ILLEGAL_PARAMETER;
             SSLerr(SSL_F_DTLS1_READ_BYTES, SSL_R_BAD_CHANGE_CIPHER_SPEC);
-            goto err;
+            goto f_err;
         }
 
         rr->length = 0;
@@ -1830,8 +1938,13 @@ static DTLS1_BITMAP *dtls1_get_bitmap(SSL *s, SSL3_RECORD *rr,
     if (rr->epoch == s->d1->r_epoch)
         return &s->d1->bitmap;
 
-    /* Only HM and ALERT messages can be from the next epoch */
+    /*
+     * Only HM and ALERT messages can be from the next epoch and only if we
+     * have already processed all of the unprocessed records from the last
+     * epoch
+     */
     else if (rr->epoch == (unsigned long)(s->d1->r_epoch + 1) &&
+             s->d1->unprocessed_rcds.epoch != s->d1->r_epoch &&
              (rr->type == SSL3_RT_HANDSHAKE || rr->type == SSL3_RT_ALERT)) {
         *is_next_epoch = 1;
         return &s->d1->next_bitmap;
@@ -1910,6 +2023,12 @@ void dtls1_reset_seq_numbers(SSL *s, int rw)
         s->d1->r_epoch++;
         memcpy(&(s->d1->bitmap), &(s->d1->next_bitmap), sizeof(DTLS1_BITMAP));
         memset(&(s->d1->next_bitmap), 0x00, sizeof(DTLS1_BITMAP));
+
+        /*
+         * We must not use any buffered messages received from the previous
+         * epoch
+         */
+        dtls1_clear_received_buffer(s);
     } else {
         seq = s->s3->write_sequence;
         memcpy(s->d1->last_write_sequence, seq,

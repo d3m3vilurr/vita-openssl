@@ -810,14 +810,15 @@ static int cryptodev_digest_update(EVP_MD_CTX *ctx, const void *data,
 
     if (!(ctx->flags & EVP_MD_CTX_FLAG_ONESHOT)) {
         /* if application doesn't support one buffer */
-        state->mac_data =
+        char *mac_data =
             OPENSSL_realloc(state->mac_data, state->mac_len + count);
 
-        if (!state->mac_data) {
+        if (mac_data == NULL) {
             printf("cryptodev_digest_update: realloc failed\n");
             return (0);
         }
 
+        state->mac_data = mac_data;
         memcpy(state->mac_data + state->mac_len, data, count);
         state->mac_len += count;
 
@@ -935,11 +936,15 @@ static int cryptodev_digest_copy(EVP_MD_CTX *to, const EVP_MD_CTX *from)
         return (0);
     }
 
+    dstate->mac_len = fstate->mac_len;
     if (fstate->mac_len != 0) {
         if (fstate->mac_data != NULL) {
             dstate->mac_data = OPENSSL_malloc(fstate->mac_len);
+            if (dstate->mac_data == NULL) {
+                printf("cryptodev_digest_init: malloc failed\n");
+                return 0;
+            }
             memcpy(dstate->mac_data, fstate->mac_data, fstate->mac_len);
-            dstate->mac_len = fstate->mac_len;
         }
     }
 
@@ -1052,7 +1057,7 @@ static int crparam2bn(struct crparam *crp, BIGNUM *a)
         return (-1);
 
     for (i = 0; i < bytes; i++)
-        pd[i] = crp->crp_p[bytes - i - 1];
+        pd[i] = ((char *)crp->crp_p)[bytes - i - 1];
 
     BN_bin2bn(pd, bytes, a);
     free(pd);
@@ -1128,7 +1133,7 @@ cryptodev_bn_mod_exp(BIGNUM *r, const BIGNUM *a, const BIGNUM *p,
         return (ret);
     }
 
-    memset(&kop, 0, sizeof kop);
+    memset(&kop, 0, sizeof(kop));
     kop.crk_op = CRK_MOD_EXP;
 
     /* inputs: a^p % m */
@@ -1179,7 +1184,7 @@ cryptodev_rsa_mod_exp(BIGNUM *r0, const BIGNUM *I, RSA *rsa, BN_CTX *ctx)
         return (0);
     }
 
-    memset(&kop, 0, sizeof kop);
+    memset(&kop, 0, sizeof(kop));
     kop.crk_op = CRK_MOD_EXP_CRT;
     /* inputs: rsa->p rsa->q I rsa->dmp1 rsa->dmq1 rsa->iqmp */
     if (bn2crparam(rsa->p, &kop.crk_param[0]))
@@ -1282,7 +1287,7 @@ static DSA_SIG *cryptodev_dsa_do_sign(const unsigned char *dgst, int dlen,
         goto err;
     }
 
-    memset(&kop, 0, sizeof kop);
+    memset(&kop, 0, sizeof(kop));
     kop.crk_op = CRK_DSA_SIGN;
 
     /* inputs: dgst dsa->p dsa->q dsa->g dsa->priv_key */
@@ -1325,7 +1330,7 @@ cryptodev_dsa_verify(const unsigned char *dgst, int dlen,
     struct crypt_kop kop;
     int dsaret = 1;
 
-    memset(&kop, 0, sizeof kop);
+    memset(&kop, 0, sizeof(kop));
     kop.crk_op = CRK_DSA_VERIFY;
 
     /* inputs: dgst dsa->p dsa->q dsa->g dsa->pub_key sig->r sig->s */
@@ -1398,7 +1403,7 @@ cryptodev_dh_compute_key(unsigned char *key, const BIGNUM *pub_key, DH *dh)
 
     keylen = BN_num_bits(dh->p);
 
-    memset(&kop, 0, sizeof kop);
+    memset(&kop, 0, sizeof(kop));
     kop.crk_op = CRK_DH_COMPUTE_KEY;
 
     /* inputs: dh->priv_key pub_key dh->p key */

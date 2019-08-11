@@ -56,7 +56,7 @@
  * [including the GNU Public Licence.]
  */
 /* ====================================================================
- * Copyright (c) 1998-2006 The OpenSSL Project.  All rights reserved.
+ * Copyright (c) 1998-2019 The OpenSSL Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -118,6 +118,7 @@
 #include <openssl/buffer.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
+#include "constant_time_locl.h"
 
 DECLARE_LHASH_OF(ERR_STRING_DATA);
 DECLARE_LHASH_OF(ERR_STATE);
@@ -172,6 +173,7 @@ static ERR_STRING_DATA ERR_str_functs[] = {
 # endif
     {ERR_PACK(0, SYS_F_OPENDIR, 0), "opendir"},
     {ERR_PACK(0, SYS_F_FREAD, 0), "fread"},
+    {ERR_PACK(0, SYS_F_FFLUSH, 0), "fflush"},
     {0, NULL},
 };
 
@@ -601,8 +603,8 @@ static void build_SYS_str_reasons(void)
             char (*dest)[LEN_SYS_STR_REASON] = &(strerror_tab[i - 1]);
             char *src = strerror(i);
             if (src != NULL) {
-                strncpy(*dest, src, sizeof *dest);
-                (*dest)[sizeof *dest - 1] = '\0';
+                strncpy(*dest, src, sizeof(*dest));
+                (*dest)[sizeof(*dest) - 1] = '\0';
                 str->string = *dest;
             }
         }
@@ -724,6 +726,8 @@ void ERR_put_error(int lib, int func, int reason, const char *file, int line)
     }
 #endif
     es = ERR_get_state();
+    if (es == NULL)
+        return;
 
     es->top = (es->top + 1) % ERR_NUM_ERRORS;
     if (es->top == es->bottom)
@@ -741,6 +745,8 @@ void ERR_clear_error(void)
     ERR_STATE *es;
 
     es = ERR_get_state();
+    if (es == NULL)
+        return;
 
     for (i = 0; i < ERR_NUM_ERRORS; i++) {
         err_clear(es, i);
@@ -805,6 +811,8 @@ static unsigned long get_error_values(int inc, int top, const char **file,
     unsigned long ret;
 
     es = ERR_get_state();
+    if (es == NULL)
+        return 0;
 
     if (inc && top) {
         if (file)
@@ -819,8 +827,24 @@ static unsigned long get_error_values(int inc, int top, const char **file,
         return ERR_R_INTERNAL_ERROR;
     }
 
+    while (es->bottom != es->top) {
+        if (es->err_flags[es->top] & ERR_FLAG_CLEAR) {
+            err_clear(es, es->top);
+            es->top = es->top > 0 ? es->top - 1 : ERR_NUM_ERRORS - 1;
+            continue;
+        }
+        i = (es->bottom + 1) % ERR_NUM_ERRORS;
+        if (es->err_flags[i] & ERR_FLAG_CLEAR) {
+            es->bottom = i;
+            err_clear(es, es->bottom);
+            continue;
+        }
+        break;
+    }
+
     if (es->bottom == es->top)
         return 0;
+
     if (top)
         i = es->top;            /* last error */
     else
@@ -867,6 +891,9 @@ void ERR_error_string_n(unsigned long e, char *buf, size_t len)
     char lsbuf[64], fsbuf[64], rsbuf[64];
     const char *ls, *fs, *rs;
     unsigned long l, f, r;
+
+    if (len == 0)
+        return;
 
     l = ERR_GET_LIB(e);
     f = ERR_GET_FUNC(e);
@@ -1012,7 +1039,6 @@ void ERR_remove_state(unsigned long pid)
 
 ERR_STATE *ERR_get_state(void)
 {
-    static ERR_STATE fallback;
     ERR_STATE *ret, tmp, *tmpp = NULL;
     int i;
     CRYPTO_THREADID tid;
@@ -1026,7 +1052,7 @@ ERR_STATE *ERR_get_state(void)
     if (ret == NULL) {
         ret = (ERR_STATE *)OPENSSL_malloc(sizeof(ERR_STATE));
         if (ret == NULL)
-            return (&fallback);
+            return NULL;
         CRYPTO_THREADID_cpy(&ret->tid, &tid);
         ret->top = 0;
         ret->bottom = 0;
@@ -1038,7 +1064,7 @@ ERR_STATE *ERR_get_state(void)
         /* To check if insertion failed, do a get. */
         if (ERRFN(thread_get_item) (ret) != ret) {
             ERR_STATE_free(ret); /* could not insert it */
-            return (&fallback);
+            return NULL;
         }
         /*
          * If a race occured in this function and we came second, tmpp is the
@@ -1062,10 +1088,10 @@ void ERR_set_error_data(char *data, int flags)
     int i;
 
     es = ERR_get_state();
+    if (es == NULL)
+        return;
 
     i = es->top;
-    if (i == 0)
-        i = ERR_NUM_ERRORS - 1;
 
     err_clear_data(es, i);
     es->err_data[i] = data;
@@ -1117,6 +1143,8 @@ int ERR_set_mark(void)
     ERR_STATE *es;
 
     es = ERR_get_state();
+    if (es == NULL)
+        return 0;
 
     if (es->bottom == es->top)
         return 0;
@@ -1129,6 +1157,8 @@ int ERR_pop_to_mark(void)
     ERR_STATE *es;
 
     es = ERR_get_state();
+    if (es == NULL)
+        return 0;
 
     while (es->bottom != es->top
            && (es->err_flags[es->top] & ERR_FLAG_MARK) == 0) {
@@ -1142,4 +1172,24 @@ int ERR_pop_to_mark(void)
         return 0;
     es->err_flags[es->top] &= ~ERR_FLAG_MARK;
     return 1;
+}
+
+void err_clear_last_constant_time(int clear)
+{
+    ERR_STATE *es;
+    int top;
+
+    es = ERR_get_state();
+    if (es == NULL)
+        return;
+
+    top = es->top;
+
+    /*
+     * Flag error as cleared but remove it elsewhere to avoid two errors
+     * accessing the same error stack location, revealing timing information.
+     */
+    clear = constant_time_select_int(constant_time_eq_int(clear, 0),
+                                     0, ERR_FLAG_CLEAR);
+    es->err_flags[top] |= clear;
 }

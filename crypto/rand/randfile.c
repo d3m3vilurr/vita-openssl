@@ -61,6 +61,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "cryptlib.h"
 #include "e_os.h"
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
@@ -115,7 +116,7 @@
 #define BUFSIZE 1024
 #define RAND_DATA 1024
 
-#ifdef OPENSSL_SYS_VMS
+#if (defined(OPENSSL_SYS_VMS) && (defined(__alpha) || defined(__ia64)))
 /*
  * This declaration is a nasty hack to get around vms' extension to fopen for
  * passing in sharing options being disabled by our /STANDARD=ANSI89
@@ -144,7 +145,24 @@ int RAND_load_file(const char *file, long bytes)
     struct stat sb;
 #endif
     int i, ret = 0, n;
+/*
+ * If setvbuf() is to be called, then the FILE pointer
+ * to it must be 32 bit.
+*/
+
+#if !defined OPENSSL_NO_SETVBUF_IONBF && defined(OPENSSL_SYS_VMS) && defined(__VMS_VER) && (__VMS_VER >= 70000000)
+    /* For 64-bit-->32 bit API Support*/
+#if __INITIAL_POINTER_SIZE == 64
+#pragma __required_pointer_size __save
+#pragma __required_pointer_size 32
+#endif
+    FILE *in; /* setvbuf() requires 32-bit pointers */
+#if __INITIAL_POINTER_SIZE == 64
+#pragma __required_pointer_size __restore
+#endif
+#else
     FILE *in;
+#endif /* OPENSSL_SYS_VMS */
 
     if (file == NULL)
         return (0);
@@ -253,7 +271,7 @@ int RAND_write_file(const char *file)
     }
 #endif
 
-#ifdef OPENSSL_SYS_VMS
+#if (defined(OPENSSL_SYS_VMS) && (defined(__alpha) || defined(__ia64)))
     /*
      * VMS NOTE: Prior versions of this routine created a _new_ version of
      * the rand file for each call into this routine, then deleted all
@@ -314,14 +332,12 @@ const char *RAND_file_name(char *buf, size_t size)
     struct stat sb;
 #endif
 
-    if (OPENSSL_issetugid() == 0)
-        s = getenv("RANDFILE");
+    s = ossl_safe_getenv("RANDFILE");
     if (s != NULL && *s && strlen(s) + 1 < size) {
         if (BUF_strlcpy(buf, s, size) >= size)
             return NULL;
     } else {
-        if (OPENSSL_issetugid() == 0)
-            s = getenv("HOME");
+        s = ossl_safe_getenv("HOME");
 #ifdef DEFAULT_HOME
         if (s == NULL) {
             s = DEFAULT_HOME;

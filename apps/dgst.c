@@ -145,7 +145,7 @@ int MAIN(int argc, char **argv)
         goto end;
 
     /* first check the program name */
-    program_name(argv[0], pname, sizeof pname);
+    program_name(argv[0], pname, sizeof(pname));
 
     md = EVP_get_digestbyname(pname);
 
@@ -241,6 +241,11 @@ int MAIN(int argc, char **argv)
             break;
         argc--;
         argv++;
+    }
+
+    if (keyfile != NULL && argc > 1) {
+        BIO_printf(bio_err, "Can only sign or verify one file\n");
+        goto end;
     }
 
     if (do_verify && !sigfile) {
@@ -532,6 +537,7 @@ int MAIN(int argc, char **argv)
         OPENSSL_free(sigbuf);
     if (bmd != NULL)
         BIO_free(bmd);
+    release_engine(e);
     apps_shutdown();
     OPENSSL_EXIT(err);
 }

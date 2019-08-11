@@ -4,7 +4,7 @@
  * project.
  */
 /* ====================================================================
- * Copyright (c) 2008 The OpenSSL Project.  All rights reserved.
+ * Copyright (c) 2008-2018 The OpenSSL Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -900,6 +900,8 @@ int capi_rsa_priv_dec(int flen, const unsigned char *from,
     unsigned char *tmpbuf;
     CAPI_KEY *capi_key;
     CAPI_CTX *ctx;
+    DWORD flags = 0;
+
     ctx = ENGINE_get_ex_data(rsa->engine, capi_idx);
 
     CAPI_trace(ctx, "Called capi_rsa_priv_dec()\n");
@@ -910,12 +912,23 @@ int capi_rsa_priv_dec(int flen, const unsigned char *from,
         return -1;
     }
 
-    if (padding != RSA_PKCS1_PADDING) {
-        char errstr[10];
-        BIO_snprintf(errstr, 10, "%d", padding);
-        CAPIerr(CAPI_F_CAPI_RSA_PRIV_DEC, CAPI_R_UNSUPPORTED_PADDING);
-        ERR_add_error_data(2, "padding=", errstr);
-        return -1;
+    switch (padding) {
+    case RSA_PKCS1_PADDING:
+        /* Nothing to do */
+        break;
+#ifdef CRYPT_DECRYPT_RSA_NO_PADDING_CHECK
+    case RSA_NO_PADDING:
+        flags = CRYPT_DECRYPT_RSA_NO_PADDING_CHECK;
+        break;
+#endif
+    default:
+        {
+            char errstr[10];
+            BIO_snprintf(errstr, 10, "%d", padding);
+            CAPIerr(CAPI_F_CAPI_RSA_PRIV_DEC, CAPI_R_UNSUPPORTED_PADDING);
+            ERR_add_error_data(2, "padding=", errstr);
+            return -1;
+        }
     }
 
     /* Create temp reverse order version of input */
@@ -927,14 +940,17 @@ int capi_rsa_priv_dec(int flen, const unsigned char *from,
         tmpbuf[flen - i - 1] = from[i];
 
     /* Finally decrypt it */
-    if (!CryptDecrypt(capi_key->key, 0, TRUE, 0, tmpbuf, &flen)) {
+    if (!CryptDecrypt(capi_key->key, 0, TRUE, flags, tmpbuf, &flen)) {
         CAPIerr(CAPI_F_CAPI_RSA_PRIV_DEC, CAPI_R_DECRYPT_ERROR);
         capi_addlasterror();
+        OPENSSL_cleanse(tmpbuf, flen);
         OPENSSL_free(tmpbuf);
         return -1;
-    } else
+    } else {
         memcpy(to, tmpbuf, flen);
+    }
 
+    OPENSSL_cleanse(tmpbuf, flen);
     OPENSSL_free(tmpbuf);
 
     return flen;
@@ -1106,6 +1122,10 @@ static int capi_get_provname(CAPI_CTX * ctx, LPSTR * pname, DWORD * ptype,
         name = alloca(len);
     else
         name = OPENSSL_malloc(len);
+    if (name == NULL) {
+        CAPIerr(CAPI_F_CAPI_GET_PROVNAME, ERR_R_MALLOC_FAILURE);
+        return 0;
+    }
     if (!CryptEnumProviders(idx, NULL, 0, ptype, name, &len)) {
         err = GetLastError();
         if (err == ERROR_NO_MORE_ITEMS)
@@ -1286,6 +1306,10 @@ char *capi_cert_get_fname(CAPI_CTX * ctx, PCCERT_CONTEXT cert)
         (cert, CERT_FRIENDLY_NAME_PROP_ID, NULL, &dlen))
         return NULL;
     wfname = OPENSSL_malloc(dlen);
+    if (wfname == NULL) {
+        CAPIerr(CAPI_F_CAPI_CERT_GET_FNAME, ERR_R_MALLOC_FAILURE);
+        return NULL;
+    }
     if (CertGetCertificateContextProperty
         (cert, CERT_FRIENDLY_NAME_PROP_ID, wfname, &dlen)) {
         char *fname = wide_to_asc(wfname);
@@ -1436,6 +1460,11 @@ static CAPI_KEY *capi_get_key(CAPI_CTX * ctx, const TCHAR *contname,
     CAPI_KEY *key;
     DWORD dwFlags = 0;
     key = OPENSSL_malloc(sizeof(CAPI_KEY));
+    if (key == NULL) {
+        CAPIerr(CAPI_F_CAPI_GET_KEY, ERR_R_MALLOC_FAILURE);
+        capi_addlasterror();
+        goto err;
+    }
     if (sizeof(TCHAR) == sizeof(char))
         CAPI_trace(ctx, "capi_get_key, contname=%s, provname=%s, type=%d\n",
                    contname, provname, ptype);

@@ -214,7 +214,8 @@ $! The contents of these variables are copied from the LIBOBJ variable in the
 $! corresponding Makefile from each corresponding subdirectory, with .o stripped
 $! and spaces replaced with commas.
 $ LIB_ = "cryptlib,mem,mem_dbg,cversion,ex_data,cpt_err,ebcdic,"+ -
-	"uid,o_time,o_str,o_dir,o_fips,o_init,fips_ers,mem_clr"
+	"uid,o_time,o_str,o_dir,o_fips,o_init,fips_ers,mem_clr,"+ -
+	"getenv"
 $ LIB_OBJECTS = "o_names,obj_dat,obj_lib,obj_err,obj_xref"
 $ LIB_MD2 = "md2_dgst,md2_one"
 $ LIB_MD4 = "md4_dgst,md4_one"
@@ -1222,7 +1223,7 @@ $     CC = "CC"
 $     IF ARCH.EQS."VAX" .AND. F$TRNLNM("DECC$CC_DEFAULT").NES."/DECC" -
 	 THEN CC = "CC/DECC"
 $     CC = CC + " /''CC_OPTIMIZE' /''DEBUGGER' /STANDARD=RELAXED"+ -
-       "''POINTER_SIZE' /NOLIST /PREFIX=ALL" + -
+       "''POINTER_SIZE' /NOLIST /PREFIX=ALL /EXTERN_MODEL=STRICT_REFDEF" + -
        " /INCLUDE=(''CC_INCLUDES')"+ -
        CCEXTRAFLAGS
 $!

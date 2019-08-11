@@ -1,6 +1,6 @@
 /* Written by Ben Laurie, 2001 */
 /*
- * Copyright (c) 2001 The OpenSSL Project.  All rights reserved.
+ * Copyright (c) 2001-2019 The OpenSSL Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -76,6 +76,7 @@ static void hexdump(FILE *f, const char *title, const unsigned char *s, int l)
 static int convert(unsigned char *s)
 {
     unsigned char *d;
+    int digits = 0;
 
     for (d = s; *s; s += 2, ++d) {
         unsigned int n;
@@ -86,8 +87,9 @@ static int convert(unsigned char *s)
         }
         sscanf((char *)s, "%2x", &n);
         *d = (unsigned char)n;
+        digits++;
     }
-    return s - d;
+    return digits;
 }
 
 static char *sstrsep(char **string, const char *delim)
@@ -325,7 +327,7 @@ static void test1(const EVP_CIPHER *c, const unsigned char *key, int kn,
                 ERR_print_errors_fp(stderr);
                 test1_exit(12);
             }
-            if (an && !EVP_EncryptUpdate(&ctx, NULL, &outl, aad, an)) {
+            if (an && !EVP_DecryptUpdate(&ctx, NULL, &outl, aad, an)) {
                 fprintf(stderr, "AAD set failed\n");
                 ERR_print_errors_fp(stderr);
                 test1_exit(13);
@@ -504,7 +506,7 @@ int main(int argc, char **argv)
         int an = 0;
         int tn = 0;
 
-        if (!fgets((char *)line, sizeof line, f))
+        if (!fgets((char *)line, sizeof(line), f))
             break;
         if (line[0] == '#' || line[0] == '\n')
             continue;

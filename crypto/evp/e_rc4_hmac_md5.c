@@ -99,7 +99,7 @@ static int rc4_hmac_md5_init_key(EVP_CIPHER_CTX *ctx,
     return 1;
 }
 
-# if     !defined(OPENSSL_NO_ASM) &&     ( \
+# if     defined(RC4_ASM) && defined(MD5_ASM) &&     (	   \
         defined(__x86_64)       || defined(__x86_64__)  || \
         defined(_M_AMD64)       || defined(_M_X64)      || \
         defined(__INTEL__)              ) && \
@@ -269,6 +269,8 @@ static int rc4_hmac_md5_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
             len = p[arg - 2] << 8 | p[arg - 1];
 
             if (!ctx->encrypt) {
+                if (len < MD5_DIGEST_LENGTH)
+                    return -1;
                 len -= MD5_DIGEST_LENGTH;
                 p[arg - 2] = len >> 8;
                 p[arg - 1] = len;

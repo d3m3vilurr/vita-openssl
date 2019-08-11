@@ -370,7 +370,7 @@ int ASN1_STRING_set(ASN1_STRING *str, const void *_data, int len)
         else
             len = strlen(data);
     }
-    if ((str->length < len) || (str->data == NULL)) {
+    if ((str->length <= len) || (str->data == NULL)) {
         c = str->data;
         if (c == NULL)
             str->data = OPENSSL_malloc(len + 1);
@@ -456,8 +456,8 @@ void asn1_add_error(const unsigned char *address, int offset)
 {
     char buf1[DECIMAL_SIZE(address) + 1], buf2[DECIMAL_SIZE(offset) + 1];
 
-    BIO_snprintf(buf1, sizeof buf1, "%lu", (unsigned long)address);
-    BIO_snprintf(buf2, sizeof buf2, "%d", offset);
+    BIO_snprintf(buf1, sizeof(buf1), "%lu", (unsigned long)address);
+    BIO_snprintf(buf2, sizeof(buf2), "%d", offset);
     ERR_add_error_data(4, "address=", buf1, " offset=", buf2);
 }
 
