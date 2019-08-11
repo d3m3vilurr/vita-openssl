@@ -38,7 +38,7 @@
 #include "e_os2.h"
 #include "o_dir.h"
 
-#if defined OPENSSL_SYS_UNIX || defined OPENSSL_SYS_WIN32 || defined OPENSSL_SYS_WINCE
+#if defined OPENSSL_SYS_UNIX || defined OPENSSL_SYS_WIN32 || defined OPENSSL_SYS_WINCE || defined OPENSSL_SYS_VITA
 # define CURRDIR "."
 #elif defined OPENSSL_SYS_VMS
 # define CURRDIR "SYS$DISK:[]"

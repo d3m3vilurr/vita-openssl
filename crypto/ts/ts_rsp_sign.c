@@ -60,7 +60,7 @@
 #include "cryptlib.h"
 #include "o_time.h"
 
-#if defined(OPENSSL_SYS_UNIX)
+#if defined(OPENSSL_SYS_UNIX) || defined(OPENSSL_SYS_VITA)
 # include <sys/time.h>
 #endif
 
@@ -110,7 +110,7 @@ static ASN1_INTEGER *def_serial_cb(struct TS_resp_ctx *ctx, void *data)
     return NULL;
 }
 
-#if defined(OPENSSL_SYS_UNIX)
+#if defined(OPENSSL_SYS_UNIX) || defined(OPENSSL_SYS_VITA)
 
 /* Use the gettimeofday function call. */
 static int def_time_cb(struct TS_resp_ctx *ctx, void *data,

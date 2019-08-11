@@ -231,6 +231,12 @@ extern "C" {
 #  endif
 # endif
 
+/* -------------------------------- VITA ---------------------------------- */
+# if defined(__vita__)
+#  undef OPENSSL_SYS_UNIX
+#  define OPENSSL_SYS_VITA
+# endif
+
 /**
  * That's it for OS-specific stuff
  *****************************************************************************/
