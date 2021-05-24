@@ -241,6 +241,19 @@ int RAND_poll(void)
 
     return 1;
 }
+# elif defined __vita__
+#include <psp2/kernel/rng.h>
+int RAND_poll(void)
+{
+    uint32_t rnd = 0, i;
+    unsigned char buf[ENTROPY_NEEDED];
+
+    sceKernelGetRandomNumber((void *)buf, sizeof(buf));
+    RAND_add(buf, sizeof(buf), ENTROPY_NEEDED);
+    OPENSSL_cleanse(buf, sizeof(buf));
+
+    return 1;
+}
 # else                          /* !defined(__OpenBSD__) */
 int RAND_poll(void)
 {
