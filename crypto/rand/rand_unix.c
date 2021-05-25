@@ -243,7 +243,6 @@ int RAND_poll(void)
 #include <psp2/kernel/rng.h>
 int RAND_poll(void)
 {
-    uint32_t rnd = 0, i;
     unsigned char buf[ENTROPY_NEEDED];
 
     sceKernelGetRandomNumber((void *)buf, sizeof(buf));
