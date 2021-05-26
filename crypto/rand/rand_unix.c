@@ -251,7 +251,7 @@ int RAND_poll(void)
 
     return 1;
 }
-# else                          /* !defined(__OpenBSD__) */
+# else                          /* !defined(__OpenBSD__) && !defined(__vita__) */
 int RAND_poll(void)
 {
     unsigned long l;
