@@ -239,7 +239,7 @@ int RAND_poll(void)
 
     return 1;
 }
-# elif defined __vita__
+# elif defined(__vita__)
 #include <psp2/kernel/rng.h>
 int RAND_poll(void)
 {
